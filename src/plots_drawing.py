@@ -3,7 +3,7 @@ import matplotlib
 import networkx as nx
 from PIL import Image, ImageOps
 
-from actions import Action, ImageClickAction, KeyPressAction
+from actions import Action, Actions
 from macro_walk import Macro
 import matplotlib.pyplot as plt
 
@@ -16,8 +16,10 @@ def try_draw_node_image(graph, node: Action, pos):
         return
 
     img = Image.open(img_path)
-    # if max(img.width, img.height) < 50:
-    #    img = img.resize((img.width*2, img.height*2))
+    if max(img.width, img.height) < 50:
+        img = img.resize((img.width*3, img.height*3))
+    else:
+        img = img.resize((img.width * 2, img.height * 2))
 
     # add border
     img = ImageOps.expand(img, border=2, fill='black')
@@ -36,23 +38,24 @@ def draw_macro_result(macro: Type[Macro]):
     pos = nx.nx_agraph.graphviz_layout(graph, prog='dot')
 
     img_nodes = []
-    key_nodes = {}
+    text_nodes = {}
     for node in graph.nodes:
-        if type(node) is ImageClickAction:
+        if type(node) in [Actions.ImageClick, Actions.LocateImage]:
             img_nodes += [node]
-        elif type(node) is KeyPressAction:
-            key_nodes[node] = node.description_text()
+        elif type(node) in [Actions.KeyPress, Actions.Exit]:
+            text_nodes[node] = node.description_text()
         else:
             raise NotImplementedError
 
     for node in img_nodes:
         try_draw_node_image(graph, node, pos[node])
 
-    nx.draw_networkx_labels(graph, labels=key_nodes, pos=pos)
+    nx.draw_networkx_labels(graph, labels=text_nodes, pos=pos)
 
     green_edges = [edge for edge in graph.edges if edge in walk_result]
     red_edges = [edge for edge in graph.edges if edge not in walk_result]
     nx.draw_networkx_edges(graph, pos, edgelist=red_edges, edge_color='r', arrows=True)
     nx.draw_networkx_edges(graph, pos, edgelist=green_edges, edge_color='g', arrows=True)
 
+    plt.suptitle(macro.__name__)
     plt.show()
