@@ -3,10 +3,11 @@ from pathlib import Path
 from sys import path
 
 # this module is intended to be imported before all other src/* modules
-# allows to keep all the sources organized:
-# root/<working_dir>
-# root/src/*.py
-# root/data/*
+# allows to keep all the sources organized with working_dir as root:
+# working_dir/README.md
+# working_dir/<main launch files>
+# working_dir/src/*.py
+# working_dir/data/*
 
 
 def ch_project_root_dir():

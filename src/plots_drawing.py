@@ -33,9 +33,12 @@ def try_draw_node_image(graph, node: Action, pos):
 def draw_macro_result(macro: Type[Macro]):
     graph, walk_result = macro.actions_graph, macro.result_record
 
-    graph.graph['rankdir'] = 'LR'
-    graph.graph['ratio'] = '0.5'
-    pos = nx.nx_agraph.graphviz_layout(graph, prog='dot')
+    # TODO try ‘dot’, ‘twopi’, ‘fdp’, ‘sfdp’, ‘circo’
+    pos = nx.nx_pydot.pydot_layout(graph, prog='dot', root= list(graph.nodes)[0])
+
+    # bugfix, LR
+    for node in graph.nodes:
+        pos[node] = -pos[node.__repr__()][1] * 5, pos[node.__repr__()][0]
 
     img_nodes = []
     text_nodes = {}

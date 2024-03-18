@@ -1,11 +1,16 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
-
+from typing import Optional, final
 import pyautogui
 from typing_extensions import override
 
 from helpers.gui_helpers import locate_image_on_screen
+
+# it's rarely possible to execute user actions instantly after ech other
+from helpers.python_helpers import Abort
+
+DEFAULT_DELAY_SECONDS = 0.0  # 0.2
+DEFAULT_IMAGE_LOC_TIMEOUT = 0.0 # 3.0
 
 
 # TODO extract and any way to improve
@@ -15,23 +20,30 @@ def virutalmethod(self):
 
 
 class Action(ABC):
-    parallel_run: bool = False
-    is_extra_entry_node: bool = False
-    timeout: float = 0
-    attempts: int = 1
-
     def __init__(self,
-                 parallel_run: bool = False,
-                 extra_entry_node: bool = False,
-                 timeout: float = 0,
-                 attempts: int = 1):
-        self.parallel_run = parallel_run
-        self.is_extra_entry_node = extra_entry_node
-        self.timeout = timeout
+                 block_parallel_run: bool = False,
+                 is_extra_entry_node: bool = False,
+                 start_delay: float = DEFAULT_DELAY_SECONDS,
+                 attempts: int = 1,
+                 attempts_timeout: float = 0):
+        """ Args:
+        attempts_timeout: In seconds. If two options with timeout fail, simultaneous attempts are started
+        block_parallel_run: Not implemented yet """
+        # TODO implement also parallel_block ?
+        self.block_parallel_run = block_parallel_run
+        self.is_extra_entry_node = is_extra_entry_node
+        # TODO implement
+        self.start_delay = start_delay
         self.attempts = attempts
+        self.attempts_timeout = attempts_timeout
+
+    @final
+    def run(self):
+        pyautogui.sleep(self.start_delay)
+        self.on_run()
 
     @abstractmethod
-    def run(self) -> bool:
+    def on_run(self) -> bool:
         raise NotImplementedError()
 
     @virutalmethod
@@ -49,11 +61,18 @@ class Action(ABC):
 class ImageClick(Action):
     """ Can be used to click on any icons or buttons which don't change picture """
 
-    def __init__(self, image_path: Path, expected_region, confidence=0.6, timeout=0.2, attempts=5, **kwargs):
-        super().__init__(timeout=timeout, attempts=attempts, **kwargs)
+    def __init__(self, image_path: Path,
+                 expected_region,
+                 confidence=0.6,
+                 attempts_timeout=DEFAULT_IMAGE_LOC_TIMEOUT,
+                 attempts=5,
+                 **kwargs):
+        """ Args: confidence: required minimal threshold """
+
+        super().__init__(attempts_timeout=attempts_timeout, attempts=attempts, **kwargs)
         self.expected_region = expected_region
         self.image_path: Path = image_path
-        self.confidence = confidence
+        self.req_confidence = confidence
 
     @override
     def description_text(self, in_short: bool = False) -> Optional[str]:
@@ -67,8 +86,8 @@ class ImageClick(Action):
         return str(self.image_path)
 
     @override
-    def run(self):
-        xy = locate_image_on_screen(self.image_path, self.expected_region, self.confidence)
+    def on_run(self):
+        xy = locate_image_on_screen(self.image_path, self.expected_region, self.req_confidence)
         if xy:
             pyautogui.click(xy[0], xy[1])
             return True
@@ -77,13 +96,12 @@ class ImageClick(Action):
 
 
 class LocateImage(Action):
-    def __init__(self, image_path: Path, expected_region, confidence=0.6, timeout=0, attempts=1, **kwargs):
+    def __init__(self, image_path: Path, expected_region, confidence=0.6, **kwargs):
+        """ Args: confidence: required minimal threshold"""
         super().__init__(**kwargs)
         self.expected_region = expected_region
         self.image_path: Path = image_path
         self.confidence = confidence
-        self.timeout = timeout
-        self.attempts = attempts
 
     @override
     def description_text(self, in_short: bool = False) -> Optional[str]:
@@ -97,7 +115,7 @@ class LocateImage(Action):
         return str(self.image_path)
 
     @override
-    def run(self):
+    def on_run(self):
         xy = locate_image_on_screen(self.image_path, self.expected_region, self.confidence)
         return xy is not None
 
@@ -112,7 +130,7 @@ class KeyPress(Action):
         return self.key.capitalize()
 
     @override
-    def run(self):
+    def on_run(self):
         pyautogui.press(self.key)
         return True
 
@@ -126,8 +144,8 @@ class Exit(Action):
         return "Exit"
 
     @override
-    def run(self):
-        exit()
+    def on_run(self):
+        raise Abort()
 
 
 class Actions:

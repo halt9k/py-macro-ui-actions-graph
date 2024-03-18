@@ -5,8 +5,8 @@ from pathlib import Path
 PREV_TIME = time.time()
 
 
-def measure_import_time():
-    # writes time elapsed between two calls
+def perfomance_timer(stage_name: str = None):
+    # prints time elapsed from previous call
 
     global PREV_TIME
     frame = inspect.currentframe().f_back
@@ -17,4 +17,7 @@ def measure_import_time():
     elapsed_time = cur_time - PREV_TIME
     PREV_TIME = cur_time
 
-    print(f"Line {line_number} in {Path(filename).name}: Time from last call: {elapsed_time:.2f} sec")
+    if stage_name:
+        stage_name = f" stage {stage_name}"
+    line_desc = f"Line {line_number} in {Path(filename).name} {stage_name}"
+    print(f"{line_desc}: Time from last call: {elapsed_time:.2f} sec")
