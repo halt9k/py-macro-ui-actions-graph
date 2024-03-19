@@ -34,7 +34,8 @@ def draw_macro_result(macro: Type[Macro]):
     graph, walk_result = macro.actions_graph, macro.result_record
 
     # TODO try ‘dot’, ‘twopi’, ‘fdp’, ‘sfdp’, ‘circo’
-    pos = nx.nx_pydot.pydot_layout(graph, prog='dot', root= list(graph.nodes)[0])
+    # pos = nx.nx_pydot.pydot_layout(graph, prog='dot', root=list(graph.nodes)[0])
+    pos = nx.nx_agraph.graphviz_layout(graph, prog='dot', root=list(graph.nodes)[0])
 
     # bugfix, LR
     for node in graph.nodes:
@@ -46,7 +47,7 @@ def draw_macro_result(macro: Type[Macro]):
         if type(node) in [Actions.ImageClick, Actions.LocateImage]:
             img_nodes += [node]
         elif type(node) in [Actions.KeyPress, Actions.Exit]:
-            text_nodes[node] = node.description_text()
+            text_nodes[node] = node.info(short=True)
         else:
             raise NotImplementedError
 

@@ -1,16 +1,15 @@
 from pathlib import Path
 import networkx as nx
+from pyrect import Rect
 
 from helpers import ensure_paths  # noqa: F401
 from actions import Actions
-from macro_walk import try_walk_actions_graph, Macro
+from macro_walk import try_walk_actions_graph, Macro, DiGraphEx
 from plots_drawing import draw_macro_result
 
-
 # used to improve perfomance, but is alllowed to be incorrect
-# (left, top, width, height)
-EXPECTED_BAR_REGION = (1200, 0, 800, 100)
-EXPECTED_MENU_REGION = (1000, 0, 480, 600)
+EXPECTED_BAR_REGION = Rect( 1200, 0, 800, 100)
+EXPECTED_MENU_REGION = Rect(1000, 0, 480, 600)
 
 
 class MacroHoxxVPN(Macro):
@@ -32,14 +31,14 @@ class MacroHoxxVPN(Macro):
     EXIT = Actions.Exit()
 
     # Duplicates are ok for readability
-    actions_graph = nx.DiGraph([(SC, EXIT),
-                                (D, UK), (UK, ESC),
-                                (TE, R),
-                                (D, R), (R, UK),
-                                (D, F), (F, UK), (UK, ESC),
-                                (D, T1),
-                                (TE, T1), (T1, UK), (UK, ESC),
-                                (UK, FL), (FL, T1)])
+    actions_graph = DiGraphEx([(SC, EXIT),
+                               (D, UK), (UK, ESC),
+                               (TE, R),
+                               (D, R), (R, UK),
+                               (D, F), (F, UK), (UK, ESC),
+                               (D, T1),
+                               (TE, T1), (T1, UK), (UK, ESC),
+                               (UK, FL), (FL, T1)])
 
 
 class MacroSetupVPN(Macro):
@@ -58,18 +57,18 @@ class MacroSetupVPN(Macro):
     EXIT = Actions.Exit()
 
     # Duplicates are ok for readability
-    actions_graph = nx.DiGraph([(HC, EXIT),
-                                (D, C), (C, ESC),
-                                (D, B), (B, C),
-                                (D, T),
-                                (U, T), (T, C), (C, ESC)])
+    actions_graph = DiGraphEx(nx.DiGraph([(HC, EXIT),
+                                          (D, C), (C, ESC),
+                                          (D, B), (B, C),
+                                          (D, T),
+                                          (U, T), (T, C), (C, ESC)]))
 
 
 if __name__ == '__main__':
     print("Please remember not to abuse usage of this script demo templates. \n")
+
     try_walk_actions_graph(MacroSetupVPN)
     try_walk_actions_graph(MacroHoxxVPN)
 
     draw_macro_result(MacroSetupVPN)
     draw_macro_result(MacroHoxxVPN)
-
