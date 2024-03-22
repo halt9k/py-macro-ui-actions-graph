@@ -5,6 +5,7 @@ from typing_extensions import override as typing_extensions_override
 
 def virutalmethod(method):
 	""" Decorator to hint that optional override is possible """
+
 	method.__isvirtualmethod__ = True
 	return method
 
@@ -25,6 +26,11 @@ def check_method(method, self):
 
 # TODO implement instead @inheritance_decorators_strict_mode
 def override(method):
+	"""
+	Optional, just verifies inheritance decorators.
+	Not an optimal way to check and will be replaced later.
+	"""
+
 	@wraps(method)
 	@typing_extensions_override
 	def method_with_override(self, *args, **kwargs):

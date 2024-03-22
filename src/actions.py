@@ -1,50 +1,49 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from datetime import time
 from pathlib import Path
 from typing import Optional, final
 import pyautogui
 from pyrect import Rect
 
 from code_tools.virtual_methods import override, virutalmethod
-from helpers.gui_helpers import locate_image_on_screen
+from helpers.gui import locate_image_on_screen, CONFIDENCE_DEFAULT_THRESHOLD
 
 # it's rarely possible to execute user actions instantly after ech other
-DEFAULT_DELAY_SECONDS = 0.0  # 0.2
-DEFAULT_IMAGE_LOC_TIMEOUT = 0.0  # 3.0
+DEFAULT_DELAY_SECONDS = 0.1  # 0.2
+DEFAULT_IMAGE_LOC_INTERVAL = 0.5  # 3.0
 
 
-class Action(ABC):
-	def __init__(self,
-	             start_delay: float = DEFAULT_DELAY_SECONDS,
-	             attempts: int = 1,
-	             attempts_timeout: float = 0,
-	             block_parallel_run: bool = False,
-	             is_extra_entry_node: bool = False):
-		""" Args:
-		attempts_timeout: In seconds. If two options with timeout fail, simultaneous attempts are started
-		block_parallel_run: Not implemented yet """
+@dataclass(init=True)
+class ActionSheduleInfo:
+	""" Time in seconds. If two options with timeout fail, simultaneous attempts are started """
 
-		# TODO implement also parallel_block ?
-		self.block_parallel_run = block_parallel_run
-		self.is_extra_entry_node = is_extra_entry_node
-		# TODO implement
-		self.start_delay = start_delay
-		self.attempts = attempts
-		self.attempts_timeout = attempts_timeout
+	block_parallel_run: bool = False
+	is_extra_entry_node: bool = False
+	start_delay: float = DEFAULT_DELAY_SECONDS
+	max_attempts: int = 1
+	attempts_interval: float = 0
+	done_attempts: int = 0
+	start_time: time = None
+
+
+@dataclass(init=True)
+class Action(ABC, ActionSheduleInfo):
 
 	@final
 	def run(self):
-		pyautogui.sleep(self.start_delay)
-		self.on_run()
+		# __before_run__() # Not used yet
+		return self.__on_run__()
+		# __after_run__() # Not used yet
 
 	@abstractmethod
-	def on_run(self) -> bool:
+	def __on_run__(self) -> bool:
 		raise NotImplementedError()
 
 	@virutalmethod
 	def info(self, short: bool = False) -> Optional[str]:
 		return None
 
-	# TODO invent check if virtualmethod maring exists
 	@virutalmethod
 	def description_image_path(self) -> Optional[str]:
 		return None
@@ -52,51 +51,25 @@ class Action(ABC):
 	def __repr__(self):
 		return f"{self.__class__}  {self.__hash__()} {self.info(short=True)}"
 
+	def __hash__(self):
+		# All actions are different
+		# TODO test
+		return id(self)
 
-class ImageClick(Action):
-	""" Can be used to click on any icons or buttons which don't change picture """
 
+class ImageRelatedAction(Action, ABC):
 	def __init__(self,
-	             image_path: Path,
-	             expected_region: Rect,
-	             confidence=0.6,
-	             attempts_timeout=DEFAULT_IMAGE_LOC_TIMEOUT,
-	             attempts=5,
-	             **kwargs):
-		""" Args: confidence: required minimal threshold """
+				 image_path: Path,
+				 expected_region: Optional[Rect],
+				 confidence: float = CONFIDENCE_DEFAULT_THRESHOLD,
+				 attempts_interval: float = DEFAULT_IMAGE_LOC_INTERVAL,
+				 max_attempts: int = 5,
+				 *args, **kwargs):
+		""" Args: confidence: required threshold """
 
-		super().__init__(attempts=attempts, attempts_timeout=attempts_timeout, **kwargs)
+		super().__init__(attempts_interval=attempts_interval, max_attempts=max_attempts, *args, **kwargs)
 		self.image_path = image_path
 		self.expected_region = expected_region
-		self.req_confidence = confidence
-
-	@override
-	def info(self, short: bool = False) -> Optional[str]:
-		if short:
-			return self.image_path.name
-		else:
-			return str(self.image_path)
-
-	@override
-	def description_image_path(self):
-		return str(self.image_path)
-
-	@override
-	def on_run(self):
-		xy = locate_image_on_screen(self.image_path, self.expected_region, self.req_confidence)
-		if xy:
-			pyautogui.click(xy[0], xy[1])
-			return True
-
-		return False
-
-
-class LocateImage(Action):
-	def __init__(self, image_path: Path, expected_region: Rect, confidence=0.6, **kwargs):
-		""" Args: confidence: required minimal threshold"""
-		super().__init__(**kwargs)
-		self.expected_region = expected_region
-		self.image_path: Path = image_path
 		self.confidence = confidence
 
 	@override
@@ -110,15 +83,32 @@ class LocateImage(Action):
 	def description_image_path(self):
 		return str(self.image_path)
 
+
+class ImageClick(ImageRelatedAction):
+	""" Can be used to click on any icons or buttons which don't change picture """
+
 	@override
-	def on_run(self):
+	def __on_run__(self):
+		xy = locate_image_on_screen(self.image_path, self.expected_region, self.confidence)
+		if xy:
+			pyautogui.click(xy[0], xy[1])
+			return True
+
+		return False
+
+
+class LocateImage(ImageRelatedAction):
+	@override
+	def __on_run__(self):
 		xy = locate_image_on_screen(self.image_path, self.expected_region, self.confidence)
 		return xy is not None
 
 
 class KeyPress(Action):
-	def __init__(self, key: str, **kwargs):
-		super().__init__(**kwargs)
+	def __init__(self,
+				 key: str,
+				 *args, **kwargs):
+		super().__init__(*args, **kwargs)
 		self.key = key
 
 	@override
@@ -126,7 +116,7 @@ class KeyPress(Action):
 		return self.key.capitalize()
 
 	@override
-	def on_run(self):
+	def __on_run__(self):
 		pyautogui.press(self.key)
 		return True
 
@@ -136,15 +126,12 @@ class MacroAbort(Exception):
 
 
 class Exit(Action):
-	def __init__(self, **kwargs):
-		super().__init__(**kwargs)
-
 	@override
 	def info(self, short: bool = False) -> Optional[str]:
 		return "Exit"
 
 	@override
-	def on_run(self):
+	def __on_run__(self):
 		raise MacroAbort()
 
 

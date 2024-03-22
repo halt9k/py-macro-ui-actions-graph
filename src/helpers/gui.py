@@ -63,8 +63,8 @@ def locate_image_in_screen_region(image_path: Path, expected_region, req_confide
 	if xy and expected_region:
 		xy = xy[0] + expected_region.x, xy[1] + expected_region.y
 
-	if req_confidence == CONFIDENCE_WARNING_THRESHOLD:
-		if not xy and res_confidence > req_confidence:
+	if req_confidence == CONFIDENCE_DEFAULT_THRESHOLD:
+		if not xy and res_confidence > CONFIDENCE_WARNING_THRESHOLD:
 			print(f"Confidence in questonable zone: req {req_confidence} got {res_confidence}")
 
 	return xy

@@ -1,74 +1,92 @@
-from abc import ABC
-from typing import Type
+import time
+from dataclasses import dataclass
 
-import networkx as nx
 import pyautogui
 
 from actions import Action, MacroAbort
+from helpers.pygraphviz import DiGraphEx
+from enum import Enum
 
 
-class DiGraphEx(nx.DiGraph):
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
+class NodeResults:
+	@dataclass(init=True, frozen=True)
+	class Result:
+		text: str
+		color: str
 
-	def roots(self):
-		return [v for v, d in self.in_degree if d == 0]
-
-	def leaves(self):
-		return [v for v, d in self.out_degree if d == 0]
-
-
-class Macro(ABC):
-	description: str
-	actions_graph: DiGraphEx
-	result_record: {}
-	roots: []
-	leaves: []
+	PASS = Result('pass', 'green')
+	END = Result('end', 'red')
+	MIXED = Result('mixed', 'purple')
 
 
-# TODO add fail callbackk switch?
-def try_run_action(action: Action) -> bool:
-	assert action.attempts > 0
-	pyautogui.sleep(action.start_delay)
+class Macro:
+	def __init__(self, description: str, actions_graph: DiGraphEx):
+		self.description = description
+		self.actions_graph = actions_graph
 
-	delay = action.attempts_timeout / action.attempts
-	for _ in range(action.attempts):
-		if action.on_run():
-			return True
-		pyautogui.sleep(delay)
-	return False
+		self.nodes_run_result = {}
+		self.walked_edges = {}
+		self.roots: []
+		self.leaves: []
 
+	def update_node_walk_result(self, node, result: bool):
+		print(f'{result}: {node}')
+		res = NodeResults.PASS if result else NodeResults.END
 
-def try_walk_from_node(graph: nx.DiGraph, node: Action, prev_node: Action or None, result_record: {}):
-	def run_node_action(n):
-		# TODO proper callbacking sheduler
-		# if n.block_parallel_run:
-		return try_run_action(n)
+		if node not in self.nodes_run_result:
+			self.nodes_run_result[node] = res
+		elif self.nodes_run_result[node] != res:
+			self.nodes_run_result[node] = NodeResults.MIXED
 
-	if run_node_action(node):
-		result_record[prev_node, node] = True
-		print(f'pass: {node}')
-	else:
-		print(f'end : {node}')
-		result_record[prev_node, node] = False
-		return
+	def walk_at_node(self, node: Action):
+		assert node.max_attempts > 0
 
-	for next_node in graph.successors(node):
-		try_walk_from_node(graph, next_node, node, result_record)
+		result = node.run()
+		self.update_node_walk_result(node, result)
+		if result:
+			self.walk_edges_from_node(node)
+		return result
 
+	def walk_edges_from_node(self, node: Action):
+		"""
+		Complex routine here because it's possible that no nodes are avaliable instantly
+		and only some (yet unknown which) will be avaliable after delay
+		"""
+		next_nodes = self.actions_graph.successors(node)
 
-def try_walk_actions_graph(macro: Type[Macro]):
-	# reminder: can be optimized not to take again screenshots when no timeout expected
-	macro.result_record = {}
+		# delay, node
+		schedule = []
+		for next_node in next_nodes:
+			if next_node.block_parallel_run:
+				schedule.append([next_node.start_delay, next_node])
+				continue
 
-	print(macro.description)
-	graph = macro.actions_graph
+			for attempt in range(0, next_node.max_attempts):
+				schedule.append([next_node.attempts_interval * attempt + next_node.start_delay, next_node])
 
-	node: Action
-	extra_entry_nodes = [n for n in graph.nodes if n.is_extra_entry_node]
+		start_time = time.time()
+		for need_delay, next_node in sorted(schedule, key=lambda p: p[0]):
+			time_passed = time.time() - start_time
+			time_left = need_delay - time_passed
+			if time_left > 0:
+				pyautogui.sleep(time_left)
 
-	try:
-		for node in graph.roots() + extra_entry_nodes:
-			try_walk_from_node(graph, node, None, macro.result_record)
-	except MacroAbort:
-		return
+			self.walked_edges[node, next_node] = True
+			if self.walk_at_node(next_node):
+				return
+
+	def run_macro(self):
+		# reminder: can be optimized not to take again screenshots when no timeout expected
+		self.nodes_run_result = {}
+
+		print(self.description)
+		graph = self.actions_graph
+
+		node: Action
+		extra_entry_nodes = [n for n in graph.nodes if n.is_extra_entry_node]
+
+		try:
+			for node in graph.roots() + extra_entry_nodes:
+				self.walk_at_node(node)
+		except MacroAbort:
+			return
