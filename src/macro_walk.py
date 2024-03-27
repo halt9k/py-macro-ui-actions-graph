@@ -3,9 +3,8 @@ from dataclasses import dataclass
 
 import pyautogui
 
-from actions import Action, MacroAbort
+from macro_actions import Action, MacroAbort
 from helpers.pygraphviz import DiGraphEx
-from enum import Enum
 
 
 class NodeResults:
@@ -20,9 +19,9 @@ class NodeResults:
 
 
 class Macro:
-	def __init__(self, description: str, actions_graph: DiGraphEx):
+	def __init__(self, description: str, actions_graph):
 		self.description = description
-		self.actions_graph = actions_graph
+		self.actions_graph = DiGraphEx(actions_graph)
 
 		self.nodes_run_result = {}
 		self.walked_edges = {}

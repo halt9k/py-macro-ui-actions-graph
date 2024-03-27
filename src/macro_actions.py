@@ -7,7 +7,7 @@ import pyautogui
 from pyrect import Rect
 
 from code_tools.virtual_methods import override, virutalmethod
-from helpers.gui import locate_image_on_screen, CONFIDENCE_DEFAULT_THRESHOLD
+from helpers.gui import optimized_find_best_onscreen_match, CONFIDENCE_DEFAULT_THRESHOLD
 
 # it's rarely possible to execute user actions instantly after ech other
 DEFAULT_DELAY_SECONDS = 0.1  # 0.2
@@ -89,7 +89,7 @@ class ImageClick(ImageRelatedAction):
 
 	@override
 	def __on_run__(self):
-		xy = locate_image_on_screen(self.image_path, self.expected_region, self.confidence)
+		xy = optimized_find_best_onscreen_match(self.image_path, self.expected_region, self.confidence)
 		if xy:
 			pyautogui.click(xy[0], xy[1])
 			return True
@@ -100,7 +100,7 @@ class ImageClick(ImageRelatedAction):
 class LocateImage(ImageRelatedAction):
 	@override
 	def __on_run__(self):
-		xy = locate_image_on_screen(self.image_path, self.expected_region, self.confidence)
+		xy = optimized_find_best_onscreen_match(self.image_path, self.expected_region, self.confidence)
 		return xy is not None
 
 
