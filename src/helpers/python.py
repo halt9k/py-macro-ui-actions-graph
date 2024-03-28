@@ -1,5 +1,6 @@
 import sys
 import threading
+from collections import namedtuple
 
 
 def run_in_thread(func, *args, **kwargs):
@@ -13,6 +14,9 @@ def run_in_thread(func, *args, **kwargs):
     thread.start()
     thread.join()
     return result
+
+
+SizeTuple = namedtuple('SizeTuple', ('w', 'h'))
 
 
 def check_py_version():

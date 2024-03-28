@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Optional, final
 import pyautogui
 from pyrect import Rect
@@ -135,7 +136,8 @@ class Exit(Action):
 		raise MacroAbort()
 
 
-class Actions:
+class Actions(SimpleNamespace):
+	ImageRelatedAction = ImageRelatedAction
 	ImageClick = ImageClick
 	LocateImage = LocateImage
 	KeyPress = KeyPress

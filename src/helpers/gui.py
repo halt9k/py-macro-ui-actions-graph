@@ -18,6 +18,8 @@ CONFIDENCE_WARNING_THRESHOLD = 0.45
 
 
 def debug_show_images(imgs: [np.array]):
+	assert len(imgs) < 10
+
 	for img in imgs:
 		plt.figure()
 		if len(img.shape) == 2:

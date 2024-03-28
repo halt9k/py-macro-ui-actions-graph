@@ -1,41 +1,53 @@
 import time
+from collections import namedtuple
 from dataclasses import dataclass
+from enum import Enum
+from typing import Optional
+from functools import cached_property
 
 import pyautogui
 
-from macro_actions import Action, MacroAbort
 from helpers.pygraphviz import DiGraphEx
-
-
-class NodeResults:
-	@dataclass(init=True, frozen=True)
-	class Result:
-		text: str
-		color: str
-
-	PASS = Result('pass', 'green')
-	END = Result('end', 'red')
-	MIXED = Result('mixed', 'purple')
+from macro_actions import Action, MacroAbort
 
 
 class Macro:
+	class NodeResults:
+		@dataclass(init=True)
+		class NodeResult:
+			text: str
+			color: str
+
+		PASS = NodeResult('pass', 'green')
+		END = NodeResult('end', 'red')
+		MIXED = NodeResult('mixed', 'purple')
+
+	class WalkLog:
+		def __init__(self, graph: DiGraphEx):
+			self.graph = graph
+
+		visited_edges = {}
+		node_results = {}
+
+		@cached_property
+		def unvisited_edges(self):
+			return [e for e in self.graph.edges if e not in self.visited_edges]
+
 	def __init__(self, description: str, actions_graph):
 		self.description = description
 		self.actions_graph = DiGraphEx(actions_graph)
 
-		self.nodes_run_result = {}
-		self.walked_edges = {}
-		self.roots: []
-		self.leaves: []
+		self.walk_log: Optional[Macro.WalkLog] = None
 
 	def update_node_walk_result(self, node, result: bool):
 		print(f'{result}: {node}')
-		res = NodeResults.PASS if result else NodeResults.END
+		res = self.NodeResults.PASS if result else self.NodeResults.END
 
-		if node not in self.nodes_run_result:
-			self.nodes_run_result[node] = res
-		elif self.nodes_run_result[node] != res:
-			self.nodes_run_result[node] = NodeResults.MIXED
+		log = self.walk_log.node_results
+		if node not in log:
+			log[node] = res
+		elif log[node] != res:
+			log[node] = self.NodeResults.MIXED
 
 	def walk_at_node(self, node: Action):
 		assert node.max_attempts > 0
@@ -70,13 +82,12 @@ class Macro:
 			if time_left > 0:
 				pyautogui.sleep(time_left)
 
-			self.walked_edges[node, next_node] = True
+			self.walk_log.visited_edges[node, next_node] = True
 			if self.walk_at_node(next_node):
 				return
 
 	def run_macro(self):
-		# reminder: can be optimized not to take again screenshots when no timeout expected
-		self.nodes_run_result = {}
+		self.walk_log = self.WalkLog(self.actions_graph)
 
 		print(self.description)
 		graph = self.actions_graph
