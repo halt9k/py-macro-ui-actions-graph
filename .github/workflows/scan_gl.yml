@@ -8,5 +8,5 @@ on:
         -   cron: "0 0 1 * *"
 jobs:
     scan-reuse:
-        uses: halt9k/shared-workflows/.github/workflows/scan_gl.yml@main
+        uses: halt9k/shared-workflows/.github/workflows/scan_gl.yml@test
         secrets: inherit
