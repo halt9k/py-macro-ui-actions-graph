@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import time
+from enum import Enum
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional, final
+
 import pyautogui
 from pyrect import Rect
 
@@ -17,128 +19,133 @@ DEFAULT_IMAGE_LOC_INTERVAL = 0.5  # 3.0
 
 @dataclass(init=True)
 class ActionSheduleInfo:
-	""" Time in seconds. If two options with timeout fail, simultaneous attempts are started """
+    """ Time in seconds. If two options with timeout fail, simultaneous attempts are started """
 
-	block_parallel_run: bool = False
-	is_extra_entry_node: bool = False
-	start_delay: float = DEFAULT_DELAY_SECONDS
-	max_attempts: int = 1
-	attempts_interval: float = 0
-	done_attempts: int = 0
-	start_time: time = None
+    block_parallel_run: bool = False
+    is_extra_entry_node: bool = False
+    start_delay: float = DEFAULT_DELAY_SECONDS
+    max_attempts: int = 1
+    attempts_interval: float = 0
+    done_attempts: int = 0
+    start_time: time = None
 
 
 @dataclass(init=True)
 class Action(ABC, ActionSheduleInfo):
+    class DrawMode(Enum):
+        TEXT, IMAGE = 1, 2
 
-	@final
-	def run(self):
-		# __before_run__() # Not used yet
-		return self.__on_run__()
-		# __after_run__() # Not used yet
+    draw_mode: DrawMode = DrawMode.TEXT
 
-	@abstractmethod
-	def __on_run__(self) -> bool:
-		raise NotImplementedError()
+    @final
+    def run(self):
+        # __before_run__() # Not used yet
+        return self.__on_run__()
 
-	@virutalmethod
-	def info(self, short: bool = False) -> Optional[str]:
-		return None
+    # __after_run__() # Not used yet
 
-	@virutalmethod
-	def description_image_path(self) -> Optional[str]:
-		return None
+    @abstractmethod
+    def __on_run__(self) -> bool:
+        raise NotImplementedError()
 
-	def __repr__(self):
-		return f"{self.__class__}  {self.__hash__()} {self.info(short=True)}"
+    @virutalmethod
+    def info(self, short: bool = False) -> Optional[str]:
+        return None
 
-	def __hash__(self):
-		# All actions are different
-		# TODO test
-		return id(self)
+    @virutalmethod
+    def description_image_path(self) -> Optional[str]:
+        return None
+
+    def __repr__(self):
+        return f"{self.__class__}  {self.__hash__()} {self.info(short=True)}"
+
+    def __hash__(self):
+        # All actions are unique
+        return id(self)
 
 
 class ImageRelatedAction(Action, ABC):
-	def __init__(self,
-				 image_path: Path,
-				 expected_region: Optional[Rect],
-				 confidence: float = CONFIDENCE_DEFAULT_THRESHOLD,
-				 attempts_interval: float = DEFAULT_IMAGE_LOC_INTERVAL,
-				 max_attempts: int = 5,
-				 *args, **kwargs):
-		""" Args: confidence: required threshold """
+    def __init__(self,
+                 image_path: Path,
+                 expected_region: Optional[Rect],
+                 confidence: float = CONFIDENCE_DEFAULT_THRESHOLD,
+                 attempts_interval: float = DEFAULT_IMAGE_LOC_INTERVAL,
+                 max_attempts: int = 5,
+                 draw_mode=Action.DrawMode.IMAGE,
+                 *args, **kwargs):
+        """ Args: confidence: required threshold """
 
-		super().__init__(attempts_interval=attempts_interval, max_attempts=max_attempts, *args, **kwargs)
-		self.image_path = image_path
-		self.expected_region = expected_region
-		self.confidence = confidence
+        super().__init__(attempts_interval=attempts_interval, max_attempts=max_attempts, draw_mode=draw_mode, *args,
+                         **kwargs)
+        self.image_path = image_path
+        self.expected_region = expected_region
+        self.confidence = confidence
 
-	@override
-	def info(self, short: bool = False) -> Optional[str]:
-		if short:
-			return self.image_path.name
-		else:
-			return str(self.image_path)
+    @override
+    def info(self, short: bool = False) -> Optional[str]:
+        if short:
+            return self.image_path.name
+        else:
+            return str(self.image_path)
 
-	@override
-	def description_image_path(self):
-		return str(self.image_path)
+    @override
+    def description_image_path(self):
+        return str(self.image_path)
 
 
 class ImageClick(ImageRelatedAction):
-	""" Can be used to click on any icons or buttons which don't change picture """
+    """ Can be used to click on any icons or buttons which don't change picture """
 
-	@override
-	def __on_run__(self):
-		xy = optimized_find_best_onscreen_match(self.image_path, self.expected_region, self.confidence)
-		if xy:
-			pyautogui.click(xy[0], xy[1])
-			return True
+    @override
+    def __on_run__(self):
+        xy = optimized_find_best_onscreen_match(self.image_path, self.expected_region, self.confidence)
+        if xy:
+            pyautogui.click(xy[0], xy[1])
+            return True
 
-		return False
+        return False
 
 
 class LocateImage(ImageRelatedAction):
-	@override
-	def __on_run__(self):
-		xy = optimized_find_best_onscreen_match(self.image_path, self.expected_region, self.confidence)
-		return xy is not None
+    @override
+    def __on_run__(self):
+        xy = optimized_find_best_onscreen_match(self.image_path, self.expected_region, self.confidence)
+        return xy is not None
 
 
 class KeyPress(Action):
-	def __init__(self,
-				 key: str,
-				 *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.key = key
+    def __init__(self,
+                 key: str,
+                 *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.key = key
 
-	@override
-	def info(self, short: bool = False) -> Optional[str]:
-		return self.key.capitalize()
+    @override
+    def info(self, short: bool = False) -> Optional[str]:
+        return self.key.capitalize()
 
-	@override
-	def __on_run__(self):
-		pyautogui.press(self.key)
-		return True
+    @override
+    def __on_run__(self):
+        pyautogui.press(self.key)
+        return True
 
 
 class MacroAbort(Exception):
-	pass
+    pass
 
 
 class Exit(Action):
-	@override
-	def info(self, short: bool = False) -> Optional[str]:
-		return "Exit"
+    @override
+    def info(self, short: bool = False) -> Optional[str]:
+        return "Exit"
 
-	@override
-	def __on_run__(self):
-		raise MacroAbort()
+    @override
+    def __on_run__(self):
+        raise MacroAbort()
 
 
 class Actions(SimpleNamespace):
-	ImageRelatedAction = ImageRelatedAction
-	ImageClick = ImageClick
-	LocateImage = LocateImage
-	KeyPress = KeyPress
-	Exit = Exit
+    ImageClick = ImageClick
+    LocateImage = LocateImage
+    KeyPress = KeyPress
+    Exit = Exit

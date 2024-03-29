@@ -12,17 +12,13 @@ class DiGraphEx(nx.DiGraph):
 		super().__init__(*args, **kwargs)
 
 	@lru_cache(maxsize=10, typed=True)
-	def nodes_of_class(self, filter_class: Type[Action] = None) -> {}:
+	def nodes_with_index(self, filter_draw_type: Action.DrawMode = None) -> {}:
 		""" Dict output here is nessesary for compartability with plot lib, also gives index in node array """
-		filtered = {}
-		for i, n in enumerate(super().nodes):
-			if filter_class:
-				if isinstance(n, filter_class):
-					filtered[n] = i
-			else:
-				filtered[n] = i
-		return filtered
-		# return {n for n in super().nodes if isinstance(n, filter_class)}
+
+		if filter_draw_type:
+			return {n: i for i, n in enumerate(self.nodes) if n.draw_mode == filter_draw_type}
+		else:
+			return {n: i for i, n in enumerate(self.nodes)}
 
 	# must be in a separate file because it damages inspection
 	def roots(self):
