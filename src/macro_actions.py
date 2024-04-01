@@ -17,20 +17,17 @@ DEFAULT_DELAY_SECONDS = 0.1  # 0.2
 DEFAULT_IMAGE_LOC_INTERVAL = 0.5  # 3.0
 
 
-@dataclass(init=True)
+@dataclass(init=True, repr=False, eq=False)
 class ActionSheduleInfo:
     """ Time in seconds. If two options with timeout fail, simultaneous attempts are started """
 
     block_parallel_run: bool = False
-    is_extra_entry_node: bool = False
     start_delay: float = DEFAULT_DELAY_SECONDS
     max_attempts: int = 1
     attempts_interval: float = 0
-    done_attempts: int = 0
-    start_time: time = None
 
 
-@dataclass(init=True)
+@dataclass(init=True, repr=False, eq=False)
 class Action(ABC, ActionSheduleInfo):
     class DrawMode(Enum):
         TEXT, IMAGE = 1, 2
@@ -60,8 +57,19 @@ class Action(ABC, ActionSheduleInfo):
         return f"{self.__class__}  {self.__hash__()} {self.info(short=True)}"
 
     def __hash__(self):
-        # All actions are unique
         return id(self)
+
+
+class Dummy(Action):
+    """ Can be used, for example, to add more entry nodes """
+
+    @override
+    def info(self, short: bool = False) -> Optional[str]:
+        return "Dummy"
+
+    @override
+    def __on_run__(self):
+        return True
 
 
 class ImageRelatedAction(Action, ABC):
@@ -149,3 +157,4 @@ class Actions(SimpleNamespace):
     LocateImage = LocateImage
     KeyPress = KeyPress
     Exit = Exit
+    Dummy = Dummy

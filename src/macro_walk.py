@@ -93,10 +93,9 @@ class Macro:
 		graph = self.actions_graph
 
 		node: Action
-		extra_entry_nodes = [n for n in graph.nodes if n.is_extra_entry_node]
 
 		try:
-			for node in graph.roots() + extra_entry_nodes:
+			for node in graph.roots():
 				self.walk_at_node(node)
 		except MacroAbort:
 			return
