@@ -8,7 +8,7 @@ import numpy as np
 from PIL import Image, ImageOps
 from matplotlib import pyplot as plt
 
-from helpers.gui import debug_show_images
+from helpers.gui import show_images
 from helpers.pygraphviz import DiGraphEx
 from helpers.python import SizeTuple
 from macro_actions import Action
@@ -63,7 +63,7 @@ def get_node_sizes(graph) -> [SizeTuple]:
     for node in graph.nodes:
         if node.draw_mode == Action.DrawMode.TEXT:
             ratio = max(len(node.info(short=True)) / DEFAULT_NODE_SIZE_LETTERS, 1)
-            node_sizes += [SizeTuple(DEFAULT_NODE_SIZE * ratio, DEFAULT_NODE_SIZE)]
+            node_sizes += [SizeTuple(int(DEFAULT_NODE_SIZE * ratio), DEFAULT_NODE_SIZE)]
         elif node.draw_mode == Action.DrawMode.IMAGE:
             img = Image.open(node.description_image_path())
             w, h = improve_scale(img.width, img.height, TARGET_IMAGE_SIZE)
@@ -73,8 +73,10 @@ def get_node_sizes(graph) -> [SizeTuple]:
     return node_sizes
 
 
-def draw_with_networkx(graph: DiGraphEx, walk_log: Macro.WalkLog, nodes_pos: {}):
+def draw_with_networkx(desc: str, graph: DiGraphEx, walk_log: Macro.WalkLog, nodes_pos: {}):
     """	Matplotlib render: 	reliable, but does not support rectangle nodes """
+
+    plt.figure(desc)
 
     nodes_info = {n: n.info(short=True) for n in graph.indexed_nodes(Action.DrawMode.TEXT)}
     nx.draw_networkx_labels(graph, labels=nodes_info, pos=nodes_pos)
@@ -95,50 +97,54 @@ def draw_with_networkx(graph: DiGraphEx, walk_log: Macro.WalkLog, nodes_pos: {})
     plt.show()
 
 
-def draw_with_graphviz(graph: DiGraphEx, walk_log: Macro.WalkLog, nodes_pos: {}):
-    """ Supposed to draw high quality edges """
+def draw_with_graphviz(desc: str, graph: DiGraphEx, walk_log: Macro.WalkLog, nodes_pos: {}):
+    """ Supposed to draw HQ graph with correct rectangle nodes """
 
-    # TODO common routine for both draw
-    node_sizes = [300.0] * len(graph.nodes)
-    img_nodes = graph.indexed_nodes(Action.DrawMode.IMAGE)
-    for node in img_nodes:
-        img_shape = plot_node_image(node, nodes_pos[node], walk_log.node_results.get(node, None))
-        if img_shape:
-            node_sizes[img_nodes[node]] = max(img_shape.w, img_shape.h) * 50
-            graph.nodes[node]['shape'] = 'box'
-            graph.nodes[node]['fixedsize'] = True
-            graph.nodes[node]['width'] = img_shape[0]
-            graph.nodes[node]['height'] = img_shape[1]
+    dpi_factor = 2
 
+    for i, node in enumerate(graph.nodes):
+        graph.nodes[node]['shape'] = 'box'
+        cx, cy = nodes_pos[node]
+        graph.nodes[node]['pos'] = f"{cx},{cy}"
+        graph.nodes[node]['label'] = ""
+
+        nr = walk_log.node_results.get(node, None)
+        graph.nodes[node]['color'] = nr.color if nr else 'black'
+
+    node_sizes = get_node_sizes(graph)
+    for node, i in graph.indexed_nodes(Action.DrawMode.IMAGE).items():
+        graph.nodes[node]['fixedsize'] = True
+        graph.nodes[node]['width'] = node_sizes[i].w / 100
+        graph.nodes[node]['height'] = node_sizes[i].h / 100
+        graph.nodes[node]['image'] = node.description_image_path()
+        graph.nodes[node]['imagescale'] = 'both'
+        # fast fix for imaages overlap half of border
+        graph.nodes[node]['penwidth'] = dpi_factor * 2
+
+    for node, i in graph.indexed_nodes(Action.DrawMode.TEXT).items():
+        graph.nodes[node]['label'] = node.info(short=True)
+
+    for edge in graph.edges:
+        if edge in walk_log.visited_edges:
+            graph.edges[edge]['color'] = 'green'
+        else:
+            graph.edges[edge]['color'] = 'black'
+
+    graph.graph['dpi'] = 100 * dpi_factor
     agraph = nx.nx_agraph.to_agraph(graph)
-    for node, position in nodes_pos.items():
-        agraph.node_attr(node)['pos'] = f"{position[0]},{position[1]}"
 
-    # graph.graph['size'] = '10,10'
-    agraph = nx.nx_agraph.to_agraph(graph)
-    agraph.graph_attr['size'] = '10,10'
-    agraph.graph_attr['dpi'] = '100'
-
-    img = agraph.draw(prog='neato', format='png')
-    # cv2.imshow(macro.description, img)
-    cv2.imshow("macro.description", img)
-
-    img_bytes = agraph.draw(prog='neato', format='png')
+    img_bytes = agraph.draw(prog='dot', format='png')
     nparr = np.frombuffer(img_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    debug_show_images([img])
-    # walk_log.unvizited_edges
-    # walk_log.vizited_edges
-    # nx.nx_agraph.view_pygraphviz()
+    image_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    image_rgb = cv2.cvtColor(image_bgr , cv2.COLOR_BGR2RGB)
+
+    # cv2.imshow(desc, img)
+    show_images([image_rgb])
 
 
 def estimate_graph_layout(graph):
     graph.graph['rankdir'] = 'LR'
     graph.graph['ratio'] = 3 / 4
-
-    # graph.graph['size'] = "1,1"
-    # graph.graph['dpi'] = "0.1"
-    # graph.graph['bb'] = "0,0,100,100"
 
     # All: ‘dot’, ‘twopi’, ‘fdp’, ‘sfdp’, ‘circo’, 'neato'
     # Good: ‘dot’, 'neato'
@@ -155,5 +161,5 @@ def draw_macro_result(macro: Macro):
     graph = macro.actions_graph
     nodes_pos = estimate_graph_layout(graph)
 
-    draw_with_networkx(graph, macro.walk_log, nodes_pos)
-    # draw_with_graphviz(graph, macro.walk_log,  nodes_pos)
+    # draw_with_networkx(macro.description, graph, macro.walk_log, nodes_pos)
+    draw_with_graphviz(macro.description, graph, macro.walk_log,  nodes_pos)

@@ -15,7 +15,8 @@ CONFIDENCE_DEFAULT_THRESHOLD = 0.65
 CONFIDENCE_WARNING_THRESHOLD = 0.45
 
 
-def debug_show_images(imgs: [np.array]):
+def show_images(imgs: [np.array]):
+    """ Better than OpenCV because compartible with PyCharm Evaluate """
     assert len(imgs) < 10
 
     for img in imgs:
