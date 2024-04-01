@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import time
 from enum import Enum
 from pathlib import Path
 from types import SimpleNamespace
@@ -80,7 +79,8 @@ class ImageRelatedAction(Action, ABC):
                  attempts_interval: float = DEFAULT_IMAGE_LOC_INTERVAL,
                  max_attempts: int = 5,
                  draw_mode=Action.DrawMode.IMAGE,
-                 *args, **kwargs):
+                 *args,
+                 **kwargs):
         """ Args: confidence: required threshold """
 
         super().__init__(attempts_interval=attempts_interval, max_attempts=max_attempts, draw_mode=draw_mode, *args,
@@ -122,9 +122,7 @@ class LocateImage(ImageRelatedAction):
 
 
 class KeyPress(Action):
-    def __init__(self,
-                 key: str,
-                 *args, **kwargs):
+    def __init__(self, key: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.key = key
 

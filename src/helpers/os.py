@@ -2,6 +2,7 @@ from os import chdir
 from pathlib import Path
 from sys import path
 
+
 # this module is intended to be imported before all other src/* modules
 # allows to keep all the sources organized with working_dir as root:
 # working_dir/README.md
@@ -12,7 +13,7 @@ from sys import path
 
 def ch_project_root_dir():
     this_file_path = Path(__file__).parent
-    assert(this_file_path.name == 'helpers')
+    assert (this_file_path.name == 'helpers')
 
     new_working_dir = str(this_file_path.parent.parent)
 
