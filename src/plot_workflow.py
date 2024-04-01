@@ -17,20 +17,22 @@ from macro_walk import Macro
 matplotlib.use('TkAgg')
 
 TARGET_IMAGE_SIZE = 80
-DEFAULT_NODE_SIZE = 30
+DEFAULT_NODE_SIZE = 40
+DEFAULT_NODE_SIZE_LETTERS = 3
 
 
-def improve_image_scale(img, target_size):
-    sz = min(img.width, img.height)
-    if not abs(sz - target_size) < target_size * 0.3:
+def improve_scale(width, height, target_size):
+    sz = (width + height) / 2
+    if abs(sz - target_size) > target_size * 0.2:
         scale = target_size / sz
 
-        relaxed_scale = 1 - (1 - scale) / 2
-        power_2_scale = pow(2, int(math.log(relaxed_scale * 4, 2)) - 1) / 2
+        if scale > 1:
+            scale = (1 + scale) / 2
+        # power_2_scale = pow(2, int(math.log(scale * 4, 2)) - 1) / 2
 
-        w, h = int(img.width * power_2_scale), int(img.height * power_2_scale)
-        img = img.resize((w, h), Image.Resampling.BICUBIC)
-    return img
+        width, height = int(width * scale), int(height * scale)
+
+    return width, height
 
 
 def plot_node_image(node: Action, pos, node_result: Macro.NodeResults.NodeResult) -> Optional[SizeTuple]:
@@ -41,7 +43,8 @@ def plot_node_image(node: Action, pos, node_result: Macro.NodeResults.NodeResult
         return
 
     img = Image.open(img_path)
-    img = improve_image_scale(img, TARGET_IMAGE_SIZE)
+    w, h = improve_scale(img.width, img.height, TARGET_IMAGE_SIZE)
+    img = img.resize((w, h), Image.Resampling.BICUBIC)
 
     border_color = node_result.color if node_result else 'black'
     img = ImageOps.expand(img, border=5, fill=border_color)
@@ -55,29 +58,37 @@ def plot_node_image(node: Action, pos, node_result: Macro.NodeResults.NodeResult
 def get_node_sizes(graph) -> [SizeTuple]:
     """	Tries to estimate nessesary size in pixels for drawing """
 
-    node_sizes = [SizeTuple(DEFAULT_NODE_SIZE, DEFAULT_NODE_SIZE)] * len(graph.nodes)
-    for node, i in graph.nodes_with_index(Action.DrawMode.IMAGE).items():
-        img = Image.open(node.description_image_path())
-        node_sizes[i] = SizeTuple(img.width, img.height)
+    node: Action
+    node_sizes = []
+    for node in graph.nodes:
+        if node.draw_mode == Action.DrawMode.TEXT:
+            ratio = max(len(node.info(short=True)) / DEFAULT_NODE_SIZE_LETTERS, 1)
+            node_sizes += [SizeTuple(DEFAULT_NODE_SIZE * ratio, DEFAULT_NODE_SIZE)]
+        elif node.draw_mode == Action.DrawMode.IMAGE:
+            img = Image.open(node.description_image_path())
+            w, h = improve_scale(img.width, img.height, TARGET_IMAGE_SIZE)
+            node_sizes += [SizeTuple(w, h)]
+        else:
+            raise NotImplementedError
     return node_sizes
 
 
 def draw_with_networkx(graph: DiGraphEx, walk_log: Macro.WalkLog, nodes_pos: {}):
     """	Matplotlib render: 	reliable, but does not support rectangle nodes """
 
-    nodes_info = {n: n.info(short=True) for n in graph.nodes_with_index(Action.DrawMode.TEXT)}
+    nodes_info = {n: n.info(short=True) for n in graph.indexed_nodes(Action.DrawMode.TEXT)}
     nx.draw_networkx_labels(graph, labels=nodes_info, pos=nodes_pos)
 
-    for node in graph.nodes_with_index(Action.DrawMode.IMAGE):
+    for node in graph.indexed_nodes(Action.DrawMode.IMAGE):
         plot_node_image(node, nodes_pos[node], walk_log.node_results.get(node, None))
 
-    node_sizes = [max(sz.h, sz.w) * 10 for sz in get_node_sizes(graph)]
+    node_sizes = [max(sz.h, sz.w) * 15 for sz in get_node_sizes(graph)]
 
-    nx.draw_networkx_nodes(graph, nodes_pos, node_size=node_sizes, alpha=0.3)
+    # nx.draw_networkx_nodes(graph, nodes_pos, node_size=node_sizes, alpha=0.3)
 
     nx.draw_networkx_edges(graph, nodes_pos, edgelist=walk_log.unvisited_edges, edge_color='black', width=1,
                            node_size=node_sizes, style='dashed')
-    nx.draw_networkx_edges(graph, nodes_pos, edgelist=walk_log.visited_edges, edge_color='green', width=3,
+    nx.draw_networkx_edges(graph, nodes_pos, edgelist=walk_log.visited_edges, edge_color='green', width=2,
                            node_size=node_sizes)
 
     plt.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
@@ -89,7 +100,7 @@ def draw_with_graphviz(graph: DiGraphEx, walk_log: Macro.WalkLog, nodes_pos: {})
 
     # TODO common routine for both draw
     node_sizes = [300.0] * len(graph.nodes)
-    img_nodes = graph.nodes_with_index(Action.DrawMode.IMAGE)
+    img_nodes = graph.indexed_nodes(Action.DrawMode.IMAGE)
     for node in img_nodes:
         img_shape = plot_node_image(node, nodes_pos[node], walk_log.node_results.get(node, None))
         if img_shape:
@@ -103,7 +114,6 @@ def draw_with_graphviz(graph: DiGraphEx, walk_log: Macro.WalkLog, nodes_pos: {})
     for node, position in nodes_pos.items():
         agraph.node_attr(node)['pos'] = f"{position[0]},{position[1]}"
 
-    # TODO expected to work?
     # graph.graph['size'] = '10,10'
     agraph = nx.nx_agraph.to_agraph(graph)
     agraph.graph_attr['size'] = '10,10'

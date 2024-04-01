@@ -10,7 +10,7 @@ class DiGraphEx(nx.DiGraph):
         super().__init__(*args, **kwargs)
 
     @lru_cache(maxsize=10, typed=True)
-    def nodes_with_index(self, filter_draw_type: Action.DrawMode = None) -> {}:
+    def indexed_nodes(self, filter_draw_type: Action.DrawMode = None) -> {}:
         """ Dict output here is nessesary for compartability with plot lib, also gives index in node array """
 
         if filter_draw_type:
