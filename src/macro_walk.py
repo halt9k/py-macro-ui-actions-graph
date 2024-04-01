@@ -24,12 +24,16 @@ class Macro:
         def __init__(self, graph: DiGraphEx):
             self.graph = graph
 
-        visited_edges = {}
+        __visited_edges__ = {}
         node_results = {}
 
         @cached_property
         def unvisited_edges(self):
-            return [e for e in self.graph.edges if e not in self.visited_edges]
+            return [e for e in self.graph.edges if e not in self.__visited_edges__]
+
+        @cached_property
+        def visited_edges(self):
+            return [e for e in self.graph.edges if e in self.__visited_edges__]
 
     def __init__(self, description: str, actions_graph):
         self.description = description
@@ -80,7 +84,7 @@ class Macro:
             if time_left > 0:
                 pyautogui.sleep(time_left)
 
-            self.walk_log.visited_edges[node, next_node] = True
+            self.walk_log.__visited_edges__[node, next_node] = True
             if self.walk_at_node(next_node):
                 return
 

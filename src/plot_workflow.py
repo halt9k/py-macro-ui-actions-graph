@@ -77,7 +77,7 @@ def draw_with_networkx(graph: DiGraphEx, walk_log: Macro.WalkLog, nodes_pos: {})
 
     nx.draw_networkx_edges(graph, nodes_pos, edgelist=walk_log.unvisited_edges, edge_color='black', width=1,
                            node_size=node_sizes, style='dashed')
-    nx.draw_networkx_edges(graph, nodes_pos, edgelist=walk_log.visited_edges, edge_color='green', width=4,
+    nx.draw_networkx_edges(graph, nodes_pos, edgelist=walk_log.visited_edges, edge_color='green', width=3,
                            node_size=node_sizes)
 
     plt.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)

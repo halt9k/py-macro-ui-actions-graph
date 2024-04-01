@@ -16,7 +16,7 @@ EXPECTED_MENU_REGION = Rect(1000, 0, 480, 600)
 class UserMacroHoxx:
     description = "Trying to reactivate Hoxx VPN"
 
-    DMY = Actions.Dummy()
+    DMY = Actions.Dummy("Start")
 
     P_S = Path('./reference_screen_images/setup_vpn')
     SC = Actions.LocateImage(P_S / 'bar_icon_time_ended.png', EXPECTED_BAR_REGION, block_parallel_run=True)
@@ -54,7 +54,7 @@ class UserMacroHoxx:
 class UserMacroSetup:
     description = "Trying to reactivate Setup VPN"
 
-    DMY = Actions.Dummy()
+    DMY = Actions.Dummy("Start")
 
     P_H = Path('./reference_screen_images/hoxx_vpn')
     HC = Actions.LocateImage(P_H / 'bar_icon_time_ended.png', EXPECTED_BAR_REGION, block_parallel_run=True)
@@ -65,7 +65,7 @@ class UserMacroSetup:
     U = Actions.ImageClick(P_S / 'bar_icon_time_ended.png', EXPECTED_BAR_REGION, confidence=0.7)
     T = Actions.ImageClick(P_S / 'try_again.png', EXPECTED_MENU_REGION)
     C = Actions.ImageClick(P_S / 'canada_button.png', EXPECTED_MENU_REGION)
-    ESC = Actions.KeyPress('esc')
+    ESC = Actions.KeyPress(key='esc')
     EXIT = Actions.Exit()
 
     # Duplicates are ok for readability

@@ -16,8 +16,47 @@ DEFAULT_DELAY_SECONDS = 0.1  # 0.2
 DEFAULT_IMAGE_LOC_INTERVAL = 0.5  # 3.0
 
 
-@dataclass(init=True, repr=False, eq=False)
-class ActionSheduleInfo:
+class Action(ABC):
+    class DrawMode(Enum):
+        TEXT, IMAGE = 1, 2
+
+    def __init__(self,
+                 draw_mode: DrawMode = DrawMode.TEXT,
+                 extra_info: str = "",
+                 *args, **kwargs):
+        self.draw_mode = draw_mode
+        self.extra_info = extra_info
+
+    @final
+    def run(self):
+        # __before_run__() # Not used yet
+        return self.__on_run__()
+        # __after_run__() # Not used yet
+
+    @abstractmethod
+    def __on_run__(self) -> bool:
+        raise NotImplementedError()
+
+    @final
+    def info(self, short: bool = False) -> Optional[str]:
+        info = self.__on_info__(short) or ""
+        return info + self.extra_info
+
+    @virutalmethod
+    def __on_info__(self, short: bool = False) -> Optional[str]:
+        return None
+
+    @virutalmethod
+    def description_image_path(self) -> Optional[str]:
+        return None
+
+    def __repr__(self):
+        # method just to improve debug
+        return f"{self.__class__}  {self.__hash__()} {self.info(short=True)}"
+
+
+@dataclass(init=True, eq=False, repr=False)
+class ActionSheduleInfo(ABC):
     """ Time in seconds. If two options with timeout fail, simultaneous attempts are started """
 
     block_parallel_run: bool = False
@@ -26,52 +65,11 @@ class ActionSheduleInfo:
     attempts_interval: float = 0
 
 
-@dataclass(init=True, repr=False, eq=False)
-class Action(ABC, ActionSheduleInfo):
-    class DrawMode(Enum):
-        TEXT, IMAGE = 1, 2
-
-    draw_mode: DrawMode = DrawMode.TEXT
-
-    @final
-    def run(self):
-        # __before_run__() # Not used yet
-        return self.__on_run__()
-
-    # __after_run__() # Not used yet
-
-    @abstractmethod
-    def __on_run__(self) -> bool:
-        raise NotImplementedError()
-
-    @virutalmethod
-    def info(self, short: bool = False) -> Optional[str]:
-        return None
-
-    @virutalmethod
-    def description_image_path(self) -> Optional[str]:
-        return None
-
-    def __repr__(self):
-        return f"{self.__class__}  {self.__hash__()} {self.info(short=True)}"
-
-    def __hash__(self):
-        return id(self)
+class ScheduledAction(Action, ActionSheduleInfo, ABC):
+    pass
 
 
-class Dummy(Action):
-    """ Can be used, for example, to add more entry nodes """
-
-    @override
-    def info(self, short: bool = False) -> Optional[str]:
-        return "Dummy"
-
-    @override
-    def __on_run__(self):
-        return True
-
-
-class ImageRelatedAction(Action, ABC):
+class ImageRelatedAction(ScheduledAction):
     def __init__(self,
                  image_path: Path,
                  expected_region: Optional[Rect],
@@ -90,7 +88,7 @@ class ImageRelatedAction(Action, ABC):
         self.confidence = confidence
 
     @override
-    def info(self, short: bool = False) -> Optional[str]:
+    def __on_info__(self, short: bool = False) -> Optional[str]:
         if short:
             return self.image_path.name
         else:
@@ -99,6 +97,18 @@ class ImageRelatedAction(Action, ABC):
     @override
     def description_image_path(self):
         return str(self.image_path)
+
+
+class Dummy(ScheduledAction):
+    """ Can be used, for example, to add more entry nodes """
+
+    def __init__(self, info: str = ""):
+        extra_info = info if info else "Dummy"
+        super().__init__(start_delay=0, extra_info=extra_info)
+
+    @override
+    def __on_run__(self):
+        return True
 
 
 class ImageClick(ImageRelatedAction):
@@ -121,14 +131,11 @@ class LocateImage(ImageRelatedAction):
         return xy is not None
 
 
-class KeyPress(Action):
+class KeyPress(ScheduledAction):
     def __init__(self, key: str, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        key_name = key.capitalize()
+        super().__init__(extra_info=key_name, *args, **kwargs)
         self.key = key
-
-    @override
-    def info(self, short: bool = False) -> Optional[str]:
-        return self.key.capitalize()
 
     @override
     def __on_run__(self):
@@ -140,10 +147,9 @@ class MacroAbort(Exception):
     pass
 
 
-class Exit(Action):
-    @override
-    def info(self, short: bool = False) -> Optional[str]:
-        return "Exit"
+class Exit(ScheduledAction):
+    def __init__(self):
+        super().__init__(start_delay=0, extra_info="Exit")
 
     @override
     def __on_run__(self):
