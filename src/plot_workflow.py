@@ -1,6 +1,4 @@
-import math
 from typing import Optional
-
 import cv2
 import matplotlib
 import networkx as nx
@@ -8,7 +6,6 @@ import numpy as np
 from PIL import Image, ImageOps
 from matplotlib import pyplot as plt
 
-from helpers.gui import show_images
 from helpers.pygraphviz import DiGraphEx
 from helpers.python import SizeTuple
 from macro_actions import Action
@@ -75,7 +72,6 @@ def get_node_sizes(graph) -> [SizeTuple]:
 
 def draw_with_networkx(desc: str, graph: DiGraphEx, walk_log: Macro.WalkLog, nodes_pos: {}):
     """	Matplotlib render: 	reliable, but does not support rectangle nodes """
-
     plt.figure(desc)
 
     nodes_info = {n: n.info(short=True) for n in graph.indexed_nodes(Action.DrawMode.TEXT)}
@@ -93,7 +89,7 @@ def draw_with_networkx(desc: str, graph: DiGraphEx, walk_log: Macro.WalkLog, nod
     nx.draw_networkx_edges(graph, nodes_pos, edgelist=walk_log.visited_edges, edge_color='green', width=2,
                            node_size=node_sizes)
 
-    plt.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
+    plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
     plt.show()
 
 
@@ -137,10 +133,13 @@ def draw_with_graphviz(desc: str, graph: DiGraphEx, walk_log: Macro.WalkLog, nod
     img_bytes = agraph.draw(prog='dot', format='png')
     nparr = np.frombuffer(img_bytes, np.uint8)
     image_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    image_rgb = cv2.cvtColor(image_bgr , cv2.COLOR_BGR2RGB)
+    image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
     # cv2.imshow(desc, img)
-    show_images([image_rgb])
+    plt.figure(desc)
+    plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
+    plt.imshow(image_rgb)
+    plt.show()
 
 
 def estimate_graph_layout(graph):

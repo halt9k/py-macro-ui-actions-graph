@@ -104,21 +104,25 @@ def find_best_match_cv(img: np.array, query: np.array, req_confidence):
     min_conf, max_conf, min_pt, max_pt = cv2.minMaxLoc(matches)
     pos_center = max_pt[0] + query.shape[1] / 2, max_pt[1] + query.shape[0] / 2
 
-    if max_conf > req_confidence + 0.2:
+    if max_conf > req_confidence:
         return pos_center, max_conf
     else:
         return None, max_conf
 
 
 def is_same_image_type(img1, img2):
-    return len(img1.shape) == len(img2.shape) and img1.shape[-1] == img2.shape[-1]
+    if len(img1.shape) != len(img2.shape):
+        return False
+    if len(img1.shape) > 2 and img1.shape[-1] != img2.shape[-1]:
+        return False
+    return True
 
 
 def find_confident_match(img, query, req_confidence):
     assert is_same_image_type(img, query)
 
-    # if req_confidence > CONFIDENCE_DEFAULT_THRESHOLD:
-    #  	print(f"Warning: high confidence {req_confidence} may not work for color independent (edge) matching")
+    if req_confidence > CONFIDENCE_DEFAULT_THRESHOLD:
+        print(f"Warning: high confidence {req_confidence} may not work for color independent (edge) matching")
 
     # return locate_subimage_canter_surf(img_nb, query_nb, req_confidence)
     xy, res_confidence = find_best_match_cv(img, query, req_confidence)
@@ -146,30 +150,15 @@ def get_edge_colors(img: np.array):
     return np.unique([img[1, 1], img[1, -1], img[-1, -1], img[-1, 1]], axis=0)
 
 
-def replace_background_colors(image, remove_colors, threshold=4, replace_with=np.array([255, 255, 255])):
-    assert image.ndim == 3 and image.shape[-1] == 3
-    mask = np.zeros_like(False, shape=image.shape[:2], dtype=bool)
-
-    for col in remove_colors:
-        mask = mask | (np.sum(np.abs(image - col), axis=2) < threshold)
-
-    result = copy(image)
-    result[mask] = replace_with
-    return result
-
-
 def find_best_onscreen_match_in_region(query_img, req_confidence, hint_region=None):
     """ Skip hint_region to do slower search all screen """
 
     img = screenshot(hint_region)
 
-    # img_edges = cv2.Canny(img, 8, 8)
-    # subimage_edges = cv2.Canny(subimage, 8, 8)
+    img_edges = cv2.Canny(img, 8, 8)
+    query_edges = cv2.Canny(query_img, 8, 8)
 
-    img_nb = replace_background_colors(img, get_edge_colors(img))
-    query_nb = replace_background_colors(query_img, get_edge_colors(query_img))
-
-    xy = find_confident_match(img_nb, query_nb, req_confidence)
+    xy = find_confident_match(img_edges, query_edges, req_confidence)
     if xy and hint_region:
         xy = xy[0] + hint_region.x, xy[1] + hint_region.y
     return xy

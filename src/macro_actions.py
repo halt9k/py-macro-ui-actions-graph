@@ -12,8 +12,8 @@ from code_tools.virtual_methods import override, virutalmethod
 from helpers.gui import optimized_find_best_onscreen_match, CONFIDENCE_DEFAULT_THRESHOLD
 
 # it's rarely possible to execute user actions instantly after ech other
-DEFAULT_DELAY_SECONDS = 0.1  # 0.2
-DEFAULT_IMAGE_LOC_INTERVAL = 0.5  # 3.0
+DEFAULT_DELAY_SECONDS = 0.2
+DEFAULT_IMAGE_LOC_INTERVAL = 3.0
 
 
 class Action(ABC):

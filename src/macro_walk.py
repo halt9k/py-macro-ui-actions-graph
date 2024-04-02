@@ -6,7 +6,7 @@ from typing import Optional
 import pyautogui
 
 from helpers.pygraphviz import DiGraphEx
-from macro_actions import Action, MacroAbort
+from macro_actions import Action, MacroAbort, ScheduledAction
 
 
 class Macro:
@@ -51,7 +51,7 @@ class Macro:
         elif log[node] != res:
             log[node] = self.NodeResults.MIXED
 
-    def walk_at_node(self, node: Action):
+    def walk_at_node(self, node: ScheduledAction):
         assert node.max_attempts > 0
 
         result = node.run()
@@ -94,8 +94,7 @@ class Macro:
         print(self.description)
         graph = self.actions_graph
 
-        node: Action
-
+        node: ScheduledAction
         try:
             for node in graph.roots():
                 self.walk_at_node(node)
