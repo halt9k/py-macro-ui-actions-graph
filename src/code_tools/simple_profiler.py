@@ -1,5 +1,5 @@
-import time
 import inspect
+import time
 from pathlib import Path
 
 PREV_TIME = time.time()

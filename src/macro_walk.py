@@ -1,91 +1,103 @@
 import time
 from dataclasses import dataclass
+from functools import cached_property
+from typing import Optional
 
 import pyautogui
 
-from macro_actions import Action, MacroAbort
 from helpers.pygraphviz import DiGraphEx
-
-
-class NodeResults:
-	@dataclass(init=True, frozen=True)
-	class Result:
-		text: str
-		color: str
-
-	PASS = Result('pass', 'green')
-	END = Result('end', 'red')
-	MIXED = Result('mixed', 'purple')
+from macro_actions import Action, MacroAbort
 
 
 class Macro:
-	def __init__(self, description: str, actions_graph):
-		self.description = description
-		self.actions_graph = DiGraphEx(actions_graph)
+    class NodeResults:
+        @dataclass(init=True)
+        class NodeResult:
+            text: str
+            color: str
 
-		self.nodes_run_result = {}
-		self.walked_edges = {}
-		self.roots: []
-		self.leaves: []
+        PASS = NodeResult('pass', 'green')
+        END = NodeResult('end', 'red')
+        MIXED = NodeResult('mixed', 'purple')
 
-	def update_node_walk_result(self, node, result: bool):
-		print(f'{result}: {node}')
-		res = NodeResults.PASS if result else NodeResults.END
+    class WalkLog:
+        def __init__(self, graph: DiGraphEx):
+            self.graph = graph
 
-		if node not in self.nodes_run_result:
-			self.nodes_run_result[node] = res
-		elif self.nodes_run_result[node] != res:
-			self.nodes_run_result[node] = NodeResults.MIXED
+        __visited_edges__ = {}
+        node_results = {}
 
-	def walk_at_node(self, node: Action):
-		assert node.max_attempts > 0
+        @cached_property
+        def unvisited_edges(self):
+            return [e for e in self.graph.edges if e not in self.__visited_edges__]
 
-		result = node.run()
-		self.update_node_walk_result(node, result)
-		if result:
-			self.walk_edges_from_node(node)
-		return result
+        @cached_property
+        def visited_edges(self):
+            return [e for e in self.graph.edges if e in self.__visited_edges__]
 
-	def walk_edges_from_node(self, node: Action):
-		"""
-		Complex routine here because it's possible that no nodes are avaliable instantly
-		and only some (yet unknown which) will be avaliable after delay
-		"""
-		next_nodes = self.actions_graph.successors(node)
+    def __init__(self, description: str, actions_graph):
+        self.description = description
+        self.actions_graph = DiGraphEx(actions_graph)
 
-		# delay, node
-		schedule = []
-		for next_node in next_nodes:
-			if next_node.block_parallel_run:
-				schedule.append([next_node.start_delay, next_node])
-				continue
+        self.walk_log: Optional[Macro.WalkLog] = None
 
-			for attempt in range(0, next_node.max_attempts):
-				schedule.append([next_node.attempts_interval * attempt + next_node.start_delay, next_node])
+    def update_node_walk_result(self, node, result: bool):
+        print(f'{result}: {node}')
+        res = self.NodeResults.PASS if result else self.NodeResults.END
 
-		start_time = time.time()
-		for need_delay, next_node in sorted(schedule, key=lambda p: p[0]):
-			time_passed = time.time() - start_time
-			time_left = need_delay - time_passed
-			if time_left > 0:
-				pyautogui.sleep(time_left)
+        log = self.walk_log.node_results
+        if node not in log:
+            log[node] = res
+        elif log[node] != res:
+            log[node] = self.NodeResults.MIXED
 
-			self.walked_edges[node, next_node] = True
-			if self.walk_at_node(next_node):
-				return
+    def walk_at_node(self, node: Action):
+        assert node.max_attempts > 0
 
-	def run_macro(self):
-		# reminder: can be optimized not to take again screenshots when no timeout expected
-		self.nodes_run_result = {}
+        result = node.run()
+        self.update_node_walk_result(node, result)
+        if result:
+            self.walk_edges_from_node(node)
+        return result
 
-		print(self.description)
-		graph = self.actions_graph
+    def walk_edges_from_node(self, node: Action):
+        """
+        Complex routine here because it's possible that no nodes are avaliable instantly
+        and only some (yet unknown which) will be avaliable after delay
+        """
+        next_nodes = self.actions_graph.successors(node)
 
-		node: Action
-		extra_entry_nodes = [n for n in graph.nodes if n.is_extra_entry_node]
+        # delay, node
+        schedule = []
+        for next_node in next_nodes:
+            if next_node.block_parallel_run:
+                schedule.append([next_node.start_delay, next_node])
+                continue
 
-		try:
-			for node in graph.roots() + extra_entry_nodes:
-				self.walk_at_node(node)
-		except MacroAbort:
-			return
+            for attempt in range(0, next_node.max_attempts):
+                schedule.append([next_node.attempts_interval * attempt + next_node.start_delay, next_node])
+
+        start_time = time.time()
+        for need_delay, next_node in sorted(schedule, key=lambda p: p[0]):
+            time_passed = time.time() - start_time
+            time_left = need_delay - time_passed
+            if time_left > 0:
+                pyautogui.sleep(time_left)
+
+            self.walk_log.__visited_edges__[node, next_node] = True
+            if self.walk_at_node(next_node):
+                return
+
+    def run_macro(self):
+        self.walk_log = self.WalkLog(self.actions_graph)
+
+        print(self.description)
+        graph = self.actions_graph
+
+        node: Action
+
+        try:
+            for node in graph.roots():
+                self.walk_at_node(node)
+        except MacroAbort:
+            return
