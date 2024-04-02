@@ -129,6 +129,7 @@ def draw_with_graphviz(desc: str, graph: DiGraphEx, walk_log: Macro.WalkLog, nod
             graph.edges[edge]['color'] = 'green'
         else:
             graph.edges[edge]['color'] = 'black'
+            graph.edges[edge]['style'] = 'dashed'
 
     graph.graph['dpi'] = 100 * dpi_factor
     agraph = nx.nx_agraph.to_agraph(graph)
