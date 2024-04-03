@@ -1,4 +1,4 @@
-name: Gitleaks reused
+name: Common Maintenance Jobs
 on:
     pull_request:
     push:
